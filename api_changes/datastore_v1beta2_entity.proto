@@ -1,0 +1,201 @@
+// Copyright 2013 Google Inc. All Rights Reserved.
+//
+// The datastore v1 service proto definitions
+
+syntax = "proto2";
+
+package api.services.datastore;
+option java_package = "com.google.api.services.datastore";
+
+
+// An identifier for a particular subset of entities.
+//
+// Entities are partitioned into various subsets, each used by different
+// datasets and different namespaces within a dataset and so forth.
+//
+// All input partition IDs are normalized before use.
+// A partition ID is normalized as follows:
+//   If the partition ID is unset or is set to an empty partition ID, replace it
+//       with the context partition ID.
+//   Otherwise, if the partition ID has no dataset ID, assign it the context
+//       partition ID's dataset ID.
+// Unless otherwise documented, the context partition ID has the dataset ID set
+// to the context dataset ID and no other partition dimension set.
+//
+// A partition ID is empty if all of its fields are unset.
+//
+// Partition dimension:
+// A dimension may be unset.
+// A dimension's value must never be "".
+// A dimension's value must match [A-Za-z\d\.\-_]{1,100}
+// If the value of any dimension matches regex "__.*__",
+// the partition is reserved/read-only.
+// A reserved/read-only partition ID is forbidden in certain documented contexts.
+//
+// Dataset ID:
+// A dataset id's value must never be "".
+// A dataset id's value must match
+// ([a-z\d\-]{1,100}~)?([a-z\d][a-z\d\-\.]{0,99}:)?([a-z\d][a-z\d\-]{0,99}
+message PartitionId {
+  // The dataset ID.
+  optional string dataset_id = 3;
+  // The namespace.
+  optional string namespace = 4;
+}
+
+// A unique identifier for an entity.
+// If a key's partition id or any of its path kinds or names are
+// reserved/read-only, the key is reserved/read-only.
+// A reserved/read-only key is forbidden in certain documented contexts.
+message Key {
+  // Entities are partitioned into subsets, currently identified by a dataset
+  // (usually implicitly specified by the project) and namespace ID.
+  // Queries are scoped to a single partition.
+  optional PartitionId partition_id = 1;
+
+  // A (kind, ID/name) pair used to construct a key path.
+  //
+  // At most one of name or ID may be set.
+  // If either is set, the element is complete.
+  // If neither is set, the element is incomplete.
+  message PathElement {
+    // The kind of the entity.
+    // A kind matching regex "__.*__" is reserved/read-only.
+    // A kind must not contain more than 500 characters.
+    // Cannot be "".
+    required string kind = 1;
+    // The ID of the entity.
+    // Never equal to zero. Values less than zero are discouraged and will not
+    // be supported in the future.
+    optional int64 id = 2;
+    // The name of the entity.
+    // A name matching regex "__.*__" is reserved/read-only.
+    // A name must not be more than 500 characters.
+    // Cannot be "".
+    optional string name = 3;
+  }
+
+  // The entity path.
+  // An entity path consists of one or more elements composed of a kind and a
+  // string or numerical identifier, which identify entities. The first
+  // element identifies a <em>root entity</em>, the second element identifies
+  // a <em>child</em> of the root entity, the third element a child of the
+  // second entity, and so forth. The entities identified by all prefixes of
+  // the path are called the element's <em>ancestors</em>.
+  // An entity path is always fully complete: ALL of the entity's ancestors
+  // are required to be in the path along with the entity identifier itself.
+  // The only exception is that in some documented cases, the identifier in the
+  // last path element (for the entity) itself may be omitted. A path can never
+  // be empty.
+  repeated PathElement path_element = 2;
+}
+
+// ABSENT: ArrayValue
+
+// A message that can hold any of the supported value types and associated
+// metadata.
+//
+// At most one of the <type>Value fields may be set.
+// If none are set the value is "null".
+//
+message Value {
+  // A boolean value.
+  optional bool boolean_value = 1;
+  // An integer value.
+  optional int64 integer_value = 2;
+  // A double value.
+  optional double double_value = 3;
+  // A timestamp value.
+  optional int64 timestamp_microseconds_value = 4;
+  // A key value.
+  optional Key key_value  = 5;
+  // A blob key value.
+  optional string blob_key_value = 16;
+  // A UTF-8 encoded string value.
+  optional string string_value = 17;
+  // A blob value.
+  optional bytes blob_value = 18;
+  // An entity value.
+  // May have no key.
+  // May have a key with an incomplete key path.
+  // May have a reserved/read-only key.
+  optional Entity entity_value = 6;
+  // A list value.
+  // Cannot contain another list value.
+  // Cannot also have a meaning and indexing set.
+  repeated Value list_value = 7;
+
+  // The <code>meaning</code> field is reserved and should not be used.
+  optional int32 meaning = 14;
+
+  // If the value should be indexed.
+  //
+  // The <code>indexed</code> property may be set for a
+  // <code>null</code> value.
+  // When <code>indexed</code> is <code>true</code>, <code>stringValue</code>
+  // is limited to 500 characters and the blob value is limited to 500 bytes.
+  // Exception: If meaning is set to 2, string_value is limited to 2038
+  // characters regardless of indexed.
+  // When indexed is true, meaning 15 and 22 are not allowed, and meaning 16
+  // will be ignored on input (and will never be set on output).
+  // Input values by default have <code>indexed</code> set to
+  // <code>true</code>; however, you can explicitly set <code>indexed</code> to
+  // <code>true</code> if you want. (An output value never has
+  // <code>indexed</code> explicitly set to <code>true</code>.) If a value is
+  // itself an entity, it cannot have <code>indexed</code> set to
+  // <code>true</code>.
+  // Exception: An entity value with meaning 9, 20 or 21 may be indexed.
+  optional bool indexed = 15 [default = true];
+}
+
+// An entity.
+//
+// An entity is limited to 1 megabyte when stored. That <em>roughly</em>
+// corresponds to a limit of 1 megabyte for the serialized form of this
+// message.
+message Entity {
+  // The entity's key.
+  //
+  // An entity must have a key, unless otherwise documented (for example,
+  // an entity in <code>Value.entityValue</code> may have no key).
+  // An entity's kind is its key's path's last element's kind,
+  // or null if it has no key.
+  optional Key key = 1;
+  // The entity's properties.
+  // Each property's name must be unique for its entity.
+  repeated Property property = 2;
+}
+
+// AFTER HERE: THESE DO NOT EXIST IN THE NEW API
+
+// An entity property.
+message Property {
+  // The name of the property.
+  // A property name matching regex "__.*__" is reserved.
+  // A reserved property name is forbidden in certain documented contexts.
+  // The name must not contain more than 500 characters.
+  // Cannot be "".
+  required string name = 1;
+
+  // The value(s) of the property.
+  // Each value can have only one value property populated. For example,
+  // you cannot have a values list of <code>{ value: { integerValue: 22,
+  // stringValue: "a" } }</code>, but you can have <code>{ value: { listValue:
+  // [ { integerValue: 22 }, { stringValue: "a" } ] }</code>.
+  required Value value = 4;
+}
+
+
+// A representation of a property in a projection.
+message PropertyExpression {
+  enum AggregationFunction {
+    FIRST = 1;
+  }
+  // The property to project.
+  required PropertyReference property = 1;
+  // The aggregation function to apply to the property. Optional.
+  // Can only be used when grouping by at least one property. Must
+  // then be set on all properties in the projection that are not
+  // being grouped by.
+  optional AggregationFunction aggregation_function = 2;
+}

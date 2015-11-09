@@ -1,0 +1,237 @@
+// Copyright 2013 Google Inc. All Rights Reserved.
+//
+// The datastore v1 service proto definitions
+
+syntax = "proto2";
+
+package api.services.datastore;
+option java_package = "com.google.api.services.datastore";
+
+
+// Each rpc normalizes the partition IDs of the keys in its input entities,
+// and always returns entities with keys with normalized partition IDs.
+// (Note that applies to all entities, including entities in values.)
+service DatastoreService {
+  // Look up some entities by key.
+  rpc Lookup(LookupRequest) returns (LookupResponse) {
+  };
+  // Query for entities.
+  rpc RunQuery(RunQueryRequest) returns (RunQueryResponse) {
+  };
+  // Begin a new transaction.
+  rpc BeginTransaction(BeginTransactionRequest) returns (BeginTransactionResponse) {
+  };
+  // Commit a transaction, optionally creating, deleting or modifying some
+  // entities.
+  rpc Commit(CommitRequest) returns (CommitResponse) {
+  };
+  // Roll back a transaction.
+  rpc Rollback(RollbackRequest) returns (RollbackResponse) {
+  };
+  // Allocate IDs for incomplete keys (useful for referencing an entity before
+  // it is inserted).
+  rpc AllocateIds(AllocateIdsRequest) returns (AllocateIdsResponse) {
+  };
+}
+
+
+// The request for Lookup.
+message LookupRequest {
+
+  // Options for this lookup request. Optional.
+  optional ReadOptions read_options = 1;
+  // Keys of entities to look up from the datastore.
+  repeated Key key = 3;
+}
+
+// The response for Lookup.
+message LookupResponse {
+
+  // The order of results in these fields is undefined and has no relation to
+  // the order of the keys in the input.
+
+  // Entities found as ResultType.FULL entities.
+  repeated EntityResult found = 1;
+
+  // Entities not found as ResultType.KEY_ONLY entities.
+  repeated EntityResult missing = 2;
+
+  // A list of keys that were not looked up due to resource constraints.
+  repeated Key deferred = 3;
+}
+
+
+// The request for RunQuery.
+message RunQueryRequest {
+
+  // The options for this query.
+  optional ReadOptions read_options = 1;
+
+  // Entities are partitioned into subsets, identified by a dataset (usually
+  // implicitly specified by the project) and namespace ID. Queries are scoped
+  // to a single partition.
+  // This partition ID is normalized with the standard default context
+  // partition ID, but all other partition IDs in RunQueryRequest are
+  // normalized with this partition ID as the context partition ID.
+  optional PartitionId partition_id = 2;
+
+  // The query to run.
+  // Either this field or field gql_query must be set, but not both.
+  optional Query query = 3;
+  // The GQL query to run.
+  // Either this field or field query must be set, but not both.
+  optional GqlQuery gql_query = 7;
+}
+
+// The response for RunQuery.
+message RunQueryResponse {
+
+  // A batch of query results (always present).
+  optional QueryResultBatch batch = 1;
+
+}
+
+
+// The request for BeginTransaction.
+message BeginTransactionRequest {
+
+  enum IsolationLevel {
+    SNAPSHOT = 0;  // Read from a consistent snapshot. Concurrent transactions
+                   // conflict if their mutations conflict. For example:
+                   // Read(A),Write(B) may not conflict with Read(B),Write(A),
+                   // but Read(B),Write(B) does conflict with Read(B),Write(B).
+    SERIALIZABLE = 1; // Read from a consistent snapshot. Concurrent
+                      // transactions conflict if they cannot be serialized.
+                      // For example Read(A),Write(B) does conflict with
+                      // Read(B),Write(A) but Read(A) may not conflict with
+                      // Write(A).
+  }
+
+  // The transaction isolation level.
+  optional IsolationLevel isolation_level = 1 [default=SNAPSHOT];
+}
+
+// The response for BeginTransaction.
+message BeginTransactionResponse {
+
+  // The transaction identifier (always present).
+  optional bytes /* serialized Transaction */ transaction = 1;
+}
+
+// The request for Rollback.
+message RollbackRequest {
+
+  // The transaction identifier, returned by a call to
+  // <code>beginTransaction</code>.
+  required bytes /* serialized Transaction */ transaction = 1;
+}
+
+// The response for Rollback.
+message RollbackResponse {
+// Empty
+}
+
+
+// The request for Commit.
+message CommitRequest {
+
+  enum Mode {
+    TRANSACTIONAL = 1;
+    NON_TRANSACTIONAL = 2;
+  }
+
+  // The transaction identifier, returned by a call to
+  // <code>beginTransaction</code>. Must be set when mode is TRANSACTIONAL.
+  optional bytes /* serialized Transaction */ transaction = 1;
+  // The mutation to perform. Optional.
+  optional Mutation mutation = 2;
+  // The type of commit to perform. Either TRANSACTIONAL or NON_TRANSACTIONAL.
+  optional Mode mode = 5 [default=TRANSACTIONAL];
+}
+
+// The response for Commit.
+message CommitResponse {
+
+  // The result of performing the mutation (if any).
+  optional MutationResult mutation_result = 1;
+}
+
+
+// The request for AllocateIds.
+message AllocateIdsRequest {
+
+  // A list of keys with incomplete key paths to allocate IDs for.
+  // No key may be reserved/read-only.
+  repeated Key key = 1;
+}
+
+// The response for AllocateIds.
+message AllocateIdsResponse {
+
+  // The keys specified in the request (in the same order), each with
+  // its key path completed with a newly allocated ID.
+  repeated Key key = 1;
+}
+
+
+// A set of changes to apply.
+//
+// No entity in this message may have a reserved property name,
+// not even a property in an entity in a value.
+// No value in this message may have meaning 18,
+// not even a value in an entity in another value.
+//
+// If entities with duplicate keys are present, an arbitrary choice will
+// be made as to which is written.
+message Mutation {
+  // Entities to upsert.
+  // Each upserted entity's key must have a complete path and
+  // must not be reserved/read-only.
+  repeated Entity upsert = 1;
+  // Entities to update.
+  // Each updated entity's key must have a complete path and
+  // must not be reserved/read-only.
+  repeated Entity update = 2;
+  // Entities to insert.
+  // Each inserted entity's key must have a complete path and
+  // must not be reserved/read-only.
+  repeated Entity insert = 3;
+  // Insert entities with a newly allocated ID.
+  // Each inserted entity's key must omit the final identifier in its path and
+  // must not be reserved/read-only.
+  repeated Entity insert_auto_id = 4;
+  // Keys of entities to delete.
+  // Each key must have a complete key path and must not be reserved/read-only.
+  repeated Key delete = 5;
+  // Ignore a user specified read-only period. Optional.
+  optional bool force = 6;
+}
+
+
+// The result of applying a mutation.
+message MutationResult {
+  // Number of index writes.
+  required int32 index_updates = 1;
+  // Keys for <code>insertAutoId</code> entities. One per entity from the
+  // request, in the same order.
+  repeated Key insert_auto_id_key = 2;
+}
+
+
+// Options shared by read requests.
+message ReadOptions {
+  enum ReadConsistency {
+    DEFAULT = 0;
+    STRONG = 1;
+    EVENTUAL = 2;
+  }
+
+  // The read consistency to use.
+  // Cannot be set when transaction is set.
+  // Lookup and ancestor queries default to STRONG, global queries default to
+  // EVENTUAL and cannot be set to STRONG.
+  optional ReadConsistency read_consistency = 1 [default=DEFAULT];
+
+  // The transaction to use. Optional.
+  optional bytes /* serialized Transaction */ transaction = 2;
+}
