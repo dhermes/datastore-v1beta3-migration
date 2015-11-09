@@ -1,7 +1,7 @@
-Datastore v1beta3 Migration
----------------------------
+# Datastore `v1beta3` Migration Notes
 
-# Populating Protos
+Retrieving `.proto` Files
+-------------------------
 
 ```bash
 mkdir -p google/api
