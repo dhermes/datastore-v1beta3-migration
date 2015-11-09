@@ -1,0 +1,4 @@
+*.py[cod]
+
+# Makefile temporary build directory
+generated_python
