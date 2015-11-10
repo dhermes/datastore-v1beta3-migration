@@ -1,3 +1,8 @@
+General
+-------
+
+- Drop all uses of `optional` (is this part of `proto2->proto3`?)
+
 `datastore.proto`
 -----------------
 
@@ -18,7 +23,6 @@
   - `AllocateIdsRequest`
 
   This isn't required over HTTP(S) since it comes through the URI.
-- Drop all uses of `optional` (is this part of `proto2->proto3`?)
 - Rename `LookupRequest.key` to `LookupRequest.keys` (was and
   still is `repeated`)
 - Grouped `RunQueryRequest.query|gql_query` into a `oneof` block
@@ -53,7 +57,33 @@
 `entity.proto`
 --------------
 
-- TBD
+- Rename `PartitionId.dataset_id` to `PartitionId.project_id`
+- Rename `PartitionId.namespace` to `PartitionId.namespace_id`
+- Grouped `Key.PathElement.id|name` into a `oneof` block
+  (`oneof` is new to `proto3`) called `id_type`
+- Rename `Key.path_element` to `Key.path` (`repeated` in both)
+- Added `ArrayValue` message class, which has a single field
+  containing repeated `Value` (called `values`)
+- Changes to `Value`:
+  - Added `google.protobuf.NullValue null_value`
+  - Changed `int64 timestamp_microseconds_value` to
+    `google.protobuf.Timestamp timestamp_value`
+  - Dropped `string blob_key_value`
+  - Added `google.type.LatLng geo_point_value`
+  - Renamed the (`repeated`) `Value list_value` as
+    `ArrayValue array_value` (no longer repeated)
+  - Rename `indexed` as `exclude_from_indexes` (still
+    a `bool`)
+  - Grouped `null_value`, `boolean_value`, `integer_value`,
+    `double_value`, `timestamp_value`, `key_value`, `string_value`,
+    `blob_value`, `geo_point_value`, `entity_value`,
+    and `array_value` into a `oneof` called `value_type`
+- Changed the (`repeated`) `Entity.property` (of message type
+  `Property`) for a map: `map<string, Value>` called `Entity.properties`
+- Dropped `Property` and `PropertyExpression` message types. The first
+  (`Property`) has been obsoleted by the `map` (new to `proto3`) and
+  the second (`PropertyExpression`) was only used as a projection in
+  queries, so has been re-purposed elsewhere.
 
 `query.proto`
 -------------
