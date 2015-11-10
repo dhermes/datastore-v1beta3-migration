@@ -78,7 +78,6 @@ message PropertyReference {
   required string name = 2;
 }
 
-
 // ABSENT: Projection
 
 // The desired order for a specific property.
